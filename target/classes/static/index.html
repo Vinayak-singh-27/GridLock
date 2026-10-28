@@ -250,7 +250,10 @@ const mainView = document.getElementById('main-view');
 // ============================================================
 function connectWS() {
   try {
-    ws = new WebSocket('ws://localhost:8080/ws/simulation');
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(
+          `${wsProtocol}//${window.location.host}/ws/simulation`
+      );
     ws.onmessage = (e) => {
       simState = JSON.parse(e.data);
       updateDashboard(simState);
