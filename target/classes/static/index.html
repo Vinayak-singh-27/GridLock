@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Gridlock</title>
+<style>
+/* ===== RESET & BASE ===== */
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#f0f4f8;--sidebar:#ffffff;--accent:#1565C0;--accent2:#0288D1;
+  --green:#2E7D32;--red:#C62828;--yellow:#F9A825;--orange:#E65100;
+  --card:#fff;--border:#dde3ea;--text:#1a2332;--muted:#6b7a8d;
+  --shadow:0 2px 12px rgba(0,0,0,.08);
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+
+/* ===== TOP BAR ===== */
+header{background:linear-gradient(135deg,#1565C0,#0288D1);color:#fff;padding:10px 20px;display:flex;align-items:center;gap:16px;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+header h1{font-size:1.3rem;font-weight:700;letter-spacing:.5px;}
+header .subtitle{font-size:.75rem;opacity:.8;margin-left:4px;}
+.spacer{flex:1;}
+#sim-clock{font-size:.9rem;background:rgba(255,255,255,.15);padding:4px 12px;border-radius:20px;}
+#sim-state-badge{padding:4px 14px;border-radius:20px;font-size:.78rem;font-weight:600;background:#fff;color:var(--accent);}
+
+/* ===== LAYOUT ===== */
+.layout{display:flex;flex:1;overflow:hidden;}
+
+/* ===== SIDEBAR ===== */
+.sidebar{width:300px;min-width:260px;background:var(--sidebar);border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;gap:0;}
+.sidebar-section{border-bottom:1px solid var(--border);padding:12px 14px;}
+.sidebar-section h3{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;}
+
+/* Controls */
+.btn-row{display:flex;flex-wrap:wrap;gap:6px;}
+.btn{padding:6px 12px;border:none;border-radius:6px;cursor:pointer;font-size:.78rem;font-weight:600;transition:all .15s;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:#1976D2;}
+.btn-success{background:var(--green);color:#fff;}
+.btn-success:hover{background:#388E3C;}
+.btn-danger{background:var(--red);color:#fff;}
+.btn-danger:hover{background:#D32F2F;}
+.btn-warning{background:var(--yellow);color:#333;}
+.btn-warning:hover{background:#F57F17;}
+.btn-info{background:var(--accent2);color:#fff;}
+.btn-info:hover{background:#0277BD;}
+.btn-neutral{background:#eceff1;color:#37474f;border:1px solid #cfd8dc;}
+.btn-neutral:hover{background:#cfd8dc;}
+.btn-sm{padding:4px 8px;font-size:.72rem;}
+.btn-active{outline:2px solid var(--accent);outline-offset:2px;}
+
+/* Mode select */
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.mode-btn{padding:7px 6px;border:2px solid #dde3ea;border-radius:8px;background:#f7f9fb;color:var(--text);cursor:pointer;font-size:.72rem;font-weight:600;text-align:center;transition:all .15s;}
+.mode-btn:hover{border-color:var(--accent);background:#e8f0fe;}
+.mode-btn.active{border-color:var(--accent);background:var(--accent);color:#fff;}
+
+/* Spawn buttons */
+.spawn-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.spawn-btn{padding:7px 6px;border:1px solid #dde3ea;border-radius:8px;background:#f7f9fb;cursor:pointer;font-size:.72rem;font-weight:600;text-align:center;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:5px;}
+.spawn-btn:hover{background:#e8f0fe;border-color:var(--accent);}
+
+/* Speed */
+.speed-row{display:flex;align-items:center;gap:8px;}
+.speed-row input[type=range]{flex:1;}
+#speed-val{font-weight:700;color:var(--accent);min-width:30px;}
+
+/* Stats */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.stat-card{background:#f7f9fb;border-radius:8px;padding:8px 10px;border:1px solid #e8edf3;}
+.stat-val{font-size:1.4rem;font-weight:700;color:var(--accent);}
+.stat-lbl{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+
+/* Intersection panels */
+.inter-card{background:#f7f9fb;border:1px solid #e8edf3;border-radius:8px;padding:8px;margin-bottom:6px;}
+.inter-card h4{font-size:.78rem;font-weight:700;margin-bottom:4px;color:var(--accent);}
+.signal-row{display:flex;align-items:center;gap:6px;margin:2px 0;font-size:.7rem;}
+.sig-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.sig-green{background:#4CAF50;}
+.sig-yellow{background:#FFC107;}
+.sig-red{background:#F44336;}
+.sig-allred{background:#7B1FA2;}
+
+/* Incidents */
+.incident-item{background:#fff3e0;border:1px solid #ffe0b2;border-radius:6px;padding:6px 8px;margin-bottom:4px;font-size:.72rem;}
+.incident-item .inc-type{font-weight:700;color:var(--orange);}
+.incident-item .inc-clear{float:right;cursor:pointer;color:var(--red);font-weight:600;}
+
+/* Event log */
+#event-log{font-size:.68rem;color:var(--muted);max-height:130px;overflow-y:auto;background:#f7f9fb;border-radius:6px;padding:6px;border:1px solid #e8edf3;}
+#event-log div{border-bottom:1px solid #eef0f3;padding:2px 0;}
+
+/* View toggle */
+.view-toggle{display:flex;background:#eceff1;border-radius:8px;padding:3px;}
+.view-btn{flex:1;padding:5px 10px;border:none;border-radius:6px;background:transparent;cursor:pointer;font-size:.75rem;font-weight:600;transition:all .15s;}
+.view-btn.active{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.12);color:var(--accent);}
+
+/* ===== MAIN VIEW ===== */
+.main-view{flex:1;position:relative;overflow:hidden;background:#e8f4ea;}
+#canvas-2d{display:block;width:100%;height:100%;}
+#canvas-3d{display:none;width:100%;height:100%;}
+
+/* ===== INCIDENT TOOLBAR ===== */
+.incident-toolbar{background:#fff;border-top:1px solid var(--border);padding:8px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.incident-toolbar label{font-size:.75rem;font-weight:600;color:var(--muted);}
+.incident-toolbar select{font-size:.75rem;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:#f7f9fb;}
+
+/* ===== TOOLTIP ===== */
+.tooltip{position:absolute;background:rgba(21,30,50,.92);color:#fff;padding:6px 10px;border-radius:6px;font-size:.72rem;pointer-events:none;z-index:200;display:none;white-space:nowrap;}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;} ::-webkit-scrollbar-track{background:#f1f1f1;} ::-webkit-scrollbar-thumb{background:#c5cdd8;border-radius:4px;}
+</style>
+</head>
+<body>
+
+<!-- ===== TOP BAR ===== -->
+<header>
+  <div>
+    <span style="font-size:1.4rem;margin-right:8px;">🚦</span>
+    <span style="font-size:1.1rem;font-weight:700;">Gridlock</span>
+    <span class="subtitle">Arohan City</span>
+  </div>
+  <div class="spacer"></div>
+  <div id="sim-clock">T+0s</div>
+  <div id="sim-state-badge">STOPPED</div>
+  <div class="view-toggle">
+    <button class="view-btn active" id="btn-2d" onclick="switchView('2d')">🗺 2D</button>
+    <button class="view-btn" id="btn-3d" onclick="switchView('3d')">🧊 3D</button>
+  </div>
+</header>
+
+<!-- ===== LAYOUT ===== -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- Controls -->
+    <div class="sidebar-section">
+      <h3>Simulation Controls</h3>
+      <div class="btn-row">
+        <button class="btn btn-success" onclick="simCmd('start')">▶ Start</button>
+        <button class="btn btn-warning" onclick="simCmd('pause')">⏸ Pause</button>
+        <button class="btn btn-info"    onclick="simCmd('resume')">↩ Resume</button>
+        <button class="btn btn-danger"  onclick="simCmd('stop')">⏹ Stop</button>
+        <button class="btn btn-neutral" onclick="simCmd('reset')">↺ Reset</button>
+      </div>
+    </div>
+
+    <!-- Mode -->
+    <div class="sidebar-section">
+      <h3>Traffic Mode</h3>
+      <div class="mode-grid">
+        <div class="mode-btn active" id="mode-NORMAL"    onclick="setMode('NORMAL')">🌤 Normal</div>
+        <div class="mode-btn"        id="mode-RUSH_HOUR" onclick="setMode('RUSH_HOUR')">🚗 Rush Hour</div>
+        <div class="mode-btn"        id="mode-ACCIDENT"  onclick="setMode('ACCIDENT')">🚧 Accident</div>
+        <div class="mode-btn"        id="mode-FESTIVAL"  onclick="setMode('FESTIVAL')">🎉 Festival</div>
+      </div>
+    </div>
+
+    <!-- Speed -->
+    <div class="sidebar-section">
+      <h3>Simulation Speed</h3>
+      <div class="speed-row">
+        <span>1x</span>
+        <input type="range" min="1" max="8" value="1" id="speed-slider" oninput="setSpeed(this.value)"/>
+        <span>8x</span>
+        <span id="speed-val">1x</span>
+      </div>
+    </div>
+
+    <!-- Spawn -->
+    <div class="sidebar-section">
+      <h3>Spawn Vehicle</h3>
+      <div class="spawn-grid">
+        <button class="spawn-btn" onclick="spawnVehicle('CAR')"       style="border-color:#2196F3;color:#1565C0">🚗 Car</button>
+        <button class="spawn-btn" onclick="spawnVehicle('AMBULANCE')"  style="border-color:#F44336;color:#C62828">🚑 Ambulance</button>
+        <button class="spawn-btn" onclick="spawnVehicle('BUS')"        style="border-color:#FF9800;color:#E65100">🚌 Bus</button>
+        <button class="spawn-btn" onclick="spawnVehicle('TRUCK')"      style="border-color:#795548;color:#4E342E">🚚 Truck</button>
+      </div>
+    </div>
+
+    <!-- Live stats -->
+    <div class="sidebar-section">
+      <h3>Live Statistics</h3>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-val" id="stat-vehicles">0</div><div class="stat-lbl">Active Vehicles</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-detected">0</div><div class="stat-lbl">Detected Waiting</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-incidents">0</div><div class="stat-lbl">Active Incidents</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-mode">—</div><div class="stat-lbl">Mode</div></div>
+      </div>
+    </div>
+
+    <!-- Intersections -->
+    <div class="sidebar-section">
+      <h3>Intersection Signals</h3>
+      <div id="intersection-panels"></div>
+    </div>
+
+    <!-- Incidents -->
+    <div class="sidebar-section">
+      <h3>Incidents & Diversions</h3>
+      <div style="margin-bottom:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <select id="road-select" style="font-size:.72rem;padding:3px 6px;border:1px solid var(--border);border-radius:5px;flex:1;"></select>
+        <button class="btn btn-sm btn-danger"  onclick="createIncident('accident')">🚧 Accident</button>
+        <button class="btn btn-sm btn-warning" onclick="createIncident('festival')">🎉 Festival</button>
+      </div>
+      <div id="incident-list"></div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="sidebar-section">
+      <h3>Event Log</h3>
+      <div id="event-log"></div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <!-- MAIN CANVAS AREA -->
+  <div class="main-view" id="main-view">
+    <canvas id="canvas-2d"></canvas>
+    <canvas id="canvas-3d"></canvas>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+
+</div><!-- /layout -->
+
+<!-- ===== THREE.JS (CDN) ===== -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+// ============================================================
+//  B.E.A.T.S. FRONTEND — JavaScript
+// ============================================================
+
+const API = 'http://localhost:8080/api/simulation';
+let ws = null;
+let simState = {};
+let currentView = '2d';
+let three = null; // Three.js objects
+
+// ---- Canvas 2D ----
+const canvas2d = document.getElementById('canvas-2d');
+const ctx      = canvas2d.getContext('2d');
+const mainView = document.getElementById('main-view');
+
+// ============================================================
+//  WEBSOCKET
+// ============================================================
+function connectWS() {
+  try {
+    ws = new WebSocket('ws://localhost:8080/ws/simulation');
+    ws.onmessage = (e) => {
+      simState = JSON.parse(e.data);
+      updateDashboard(simState);
+      if (currentView === '2d') render2D(simState);
+      else if (currentView === '3d' && three) render3D(simState);
+    };
+    ws.onerror = () => setTimeout(connectWS, 3000);
+    ws.onclose = () => setTimeout(connectWS, 3000);
+  } catch(e) {
+    setTimeout(connectWS, 3000);
+  }
+}
+
+// ============================================================
+//  API HELPERS
+// ============================================================
+async function apiFetch(path, method='POST', body=null) {
+  try {
+    const opts = { method, headers:{'Content-Type':'application/json'} };
+    if (body) opts.body = JSON.stringify(body);
+    const r = await fetch(API + path, opts);
+    return await r.json();
+  } catch(e) {
+    console.warn('API error', e);
+    return null;
+  }
+}
+
+async function simCmd(cmd) { await apiFetch('/' + cmd); }
+async function setMode(m) {
+  await apiFetch('/mode/' + m);
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('mode-' + m)?.classList.add('active');
+}
+async function setSpeed(v) {
+  document.getElementById('speed-val').textContent = v + 'x';
+  await apiFetch('/speed/' + v);
+}
+async function spawnVehicle(type) { await apiFetch('/spawn/' + type); }
+async function createIncident(kind) {
+  const road = document.getElementById('road-select').value;
+  if (!road) { alert('Select a road first'); return; }
+  await apiFetch('/incident/' + kind + '/' + road);
+}
+async function clearIncident(id) { await apiFetch('/incident/' + id, 'DELETE'); }
+
+// Load roads into dropdown
+async function loadRoads() {
+  const roads = await apiFetch('/roads', 'GET');
+  if (!roads) return;
+  const sel = document.getElementById('road-select');
+  sel.innerHTML = roads.map(r => `<option value="${r.id}">${r.id} (${r.from}→${r.to})</option>`).join('');
+}
+
+// ============================================================
+//  DASHBOARD UPDATE
+// ============================================================
+function updateDashboard(s) {
+  if (!s) return;
+
+  // Clock & state
+  const sec = Math.floor((s.simTimeMs||0)/1000);
+  document.getElementById('sim-clock').textContent = `T+${sec}s`;
+  const badge = document.getElementById('sim-state-badge');
+  badge.textContent = s.state || 'STOPPED';
+  badge.style.color = s.state==='RUNNING'?'#2E7D32': s.state==='PAUSED'?'#E65100':'#C62828';
+
+  // Stats
+  const detected = (s.intersections||[]).reduce((a,i)=>(i.signals||[]).reduce((b,sg)=>b+(sg.detected||0),a),0);
+  document.getElementById('stat-vehicles').textContent = s.vehicleCount||0;
+  document.getElementById('stat-detected').textContent = detected;
+  document.getElementById('stat-incidents').textContent = (s.incidents||[]).length;
+  document.getElementById('stat-mode').textContent = (s.mode||'—').replace('_',' ');
+
+  // Mode buttons
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  const modeId = 'mode-' + (s.mode||'NORMAL');
+  document.getElementById(modeId)?.classList.add('active');
+
+  // Intersection panels
+  const panelDiv = document.getElementById('intersection-panels');
+  panelDiv.innerHTML = (s.intersections||[]).map(inter => {
+    const sigHtml = (inter.signals||[]).map(sig => {
+      const cls = sig.phase==='GREEN'?'sig-green':sig.phase==='YELLOW'?'sig-yellow':sig.phase==='ALL_RED'?'sig-allred':'sig-red';
+      const blocked = sig.blocked ? '🚫' : '';
+      const emerg   = sig.emergency ? '🚑' : '';
+      return `<div class="signal-row">
+        <div class="sig-dot ${cls}"></div>
+        <span>${sig.direction} ${blocked}${emerg}</span>
+        <span style="margin-left:auto;color:var(--muted)">${sig.phase} ${sig.remaining>0?sig.remaining+'s':''}</span>
+        <span style="margin-left:6px;font-size:.65rem">Q:${sig.queueLen} D:${sig.detected}</span>
+      </div>`;
+    }).join('');
+    return `<div class="inter-card">
+      <h4>${inter.name} <span style="font-size:.65rem;color:var(--muted)">${inter.id}</span></h4>
+      ${sigHtml}
+    </div>`;
+  }).join('');
+
+  // Incidents
+  const incDiv = document.getElementById('incident-list');
+  incDiv.innerHTML = (s.incidents||[]).map(inc =>
+    `<div class="incident-item">
+      <span class="inc-type">${inc.type}</span>: ${inc.description}
+      <span class="inc-clear" onclick="clearIncident('${inc.id}')">✕</span>
+    </div>`
+  ).join('') || '<div style="font-size:.72rem;color:var(--muted)">No active incidents</div>';
+
+  // Event log
+  const logDiv = document.getElementById('event-log');
+  logDiv.innerHTML = (s.eventLog||[]).map(e => `<div>${e}</div>`).join('');
+}
+
+// ============================================================
+//  2D MAP RENDERER
+// ============================================================
+
+// City layout constants (pixel space on a 900×600 virtual canvas)
+const CITY_W = 900, CITY_H = 600;
+let scale = 1, offsetX = 0, offsetY = 0;
+
+function resizeCanvas() {
+  const rect = mainView.getBoundingClientRect();
+  canvas2d.width  = rect.width;
+  canvas2d.height = rect.height;
+  scale   = Math.min(rect.width / CITY_W, rect.height / CITY_H) * 0.92;
+  offsetX = (rect.width  - CITY_W * scale) / 2;
+  offsetY = (rect.height - CITY_H * scale) / 2;
+}
+
+function px(x) { return offsetX + x * scale; }
+function py(y) { return offsetY + y * scale; }
+function sc(v) { return v * scale; }
+
+// Intersection pixel positions (must match ArohanCityBuilder mapX/mapY)
+const INTER_POS = {
+  CS: {x:300, y:300, name:'Central Square'},
+  MJ: {x:600, y:300, name:'Market Junction'},
+  RJ: {x:600, y:520, name:'Riverside Jct'},
+  NR: {x:300, y:100, name:'North Ring'}
+};
+
+// Road definitions (from/to, for rendering)
+const ROAD_DEFS = {
+  R_CS_MJ: {from:'CS', to:'MJ'},
+  R_MJ_RJ: {from:'MJ', to:'RJ'},
+  R_RJ_CS: {from:'RJ', to:'CS'},
+  R_CS_NR: {from:'CS', to:'NR'},
+  R_NR_MJ: {from:'NR', to:'MJ'}
+};
+
+// Lane ID → road + direction lookup (built dynamically from simState)
+let laneMap = {}; // laneId → {fromId, toId, roadId}
+
+function buildLaneMap(state) {
+  laneMap = {};
+  if (!state.roads) return;
+  state.roads.forEach(road => {
+    const rd = ROAD_DEFS[road.id];
+    if (!rd) return;
+    // AB lane: from→to
+    laneMap[road.id + '_AB'] = { fromId: road.from, toId: road.to, roadId: road.id, dir: 'AB' };
+    // BA lane: to→from
+    laneMap[road.id + '_BA'] = { fromId: road.to,   toId: road.from, roadId: road.id, dir: 'BA' };
+  });
+}
+
+function getVehicleXY(vehicle) {
+  const info = laneMap[vehicle.laneId];
+  if (!info) return null;
+  const from = INTER_POS[info.fromId];
+  const to   = INTER_POS[info.toId];
+  if (!from || !to) return null;
+  const t = vehicle.pos || 0;
+  // Offset the two lanes laterally so they don't overlap
+  const dx = to.x - from.x, dy = to.y - from.y;
+  const len = Math.sqrt(dx*dx+dy*dy);
+  const nx = -dy/len * 6, ny = dx/len * 6; // perpendicular offset
+  const side = info.dir === 'AB' ? 1 : -1;
+  return {
+    x: from.x + dx*t + nx*side,
+    y: from.y + dy*t + ny*side
+  };
+}
+
+function render2D(state) {
+  if (!state) return;
+  resizeCanvas();
+  buildLaneMap(state);
+  ctx.clearRect(0, 0, canvas2d.width, canvas2d.height);
+
+  // Background
+  ctx.fillStyle = '#e8f4ea';
+  ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
+
+  drawGrid();
+  drawRoads(state);
+  drawIntersections(state);
+  drawDetectionLines(state);
+  drawVehicles(state);
+  drawLegend();
+}
+
+function drawGrid() {
+  ctx.strokeStyle = 'rgba(180,210,180,0.35)';
+  ctx.lineWidth = 1;
+  for (let x=0; x<CITY_W; x+=50) {
+    ctx.beginPath(); ctx.moveTo(px(x),py(0)); ctx.lineTo(px(x),py(CITY_H)); ctx.stroke();
+  }
+  for (let y=0; y<CITY_H; y+=50) {
+    ctx.beginPath(); ctx.moveTo(px(0),py(y)); ctx.lineTo(px(CITY_W),py(y)); ctx.stroke();
+  }
+}
+
+function drawRoads(state) {
+  const roadStatus = {};
+  (state.roads||[]).forEach(r => roadStatus[r.id] = r);
+
+  Object.entries(ROAD_DEFS).forEach(([id, rd]) => {
+    const from = INTER_POS[rd.from];
+    const to   = INTER_POS[rd.to];
+    const info = roadStatus[id] || {};
+    const closed = info.closed;
+
+    // Road casing
+    ctx.strokeStyle = closed ? '#b71c1c' : '#90a4ae';
+    ctx.lineWidth = sc(22);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(px(from.x), py(from.y));
+    ctx.lineTo(px(to.x),   py(to.y));
+    ctx.stroke();
+
+    // Road surface
+    ctx.strokeStyle = closed ? '#ef9a9a' : '#fafafa';
+    ctx.lineWidth = sc(18);
+    ctx.beginPath();
+    ctx.moveTo(px(from.x), py(from.y));
+    ctx.lineTo(px(to.x),   py(to.y));
+    ctx.stroke();
+
+    // Center dashed line
+    ctx.strokeStyle = '#bdbdbd';
+    ctx.lineWidth = sc(1);
+    ctx.setLineDash([sc(12), sc(8)]);
+    ctx.beginPath();
+    ctx.moveTo(px(from.x), py(from.y));
+    ctx.lineTo(px(to.x),   py(to.y));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Closed overlay
+    if (closed) {
+      ctx.save();
+      ctx.font = `bold ${sc(14)}px sans-serif`;
+      ctx.fillStyle = '#c62828';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const mx = (from.x+to.x)/2, my = (from.y+to.y)/2;
+      ctx.fillText('🚧 CLOSED', px(mx), py(my)-sc(14));
+      ctx.restore();
+    }
+
+    // Road label
+    ctx.save();
+    ctx.font = `${sc(9)}px sans-serif`;
+    ctx.fillStyle = '#607d8b';
+    ctx.textAlign = 'center';
+    const mx = (from.x+to.x)/2, my = (from.y+to.y)/2;
+    ctx.fillText(id, px(mx), py(my)+sc(14));
+    ctx.restore();
+  });
+}
+
+function drawIntersections(state) {
+  const interStatus = {};
+  (state.intersections||[]).map(i => interStatus[i.id] = i);
+
+  Object.entries(INTER_POS).forEach(([id, pos]) => {
+    const info = interStatus[id] || {};
+    const hasGreen = info.greenLaneId && info.greenLaneId !== null;
+
+    // Box
+    const s = sc(24);
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = hasGreen ? '#4CAF50' : '#1565C0';
+    ctx.lineWidth = sc(2.5);
+    ctx.beginPath();
+    ctx.roundRect(px(pos.x)-s/2, py(pos.y)-s/2, s, s, sc(5));
+    ctx.fill(); ctx.stroke();
+
+    // Green pulse
+    if (hasGreen) {
+      ctx.strokeStyle = 'rgba(76,175,80,0.3)';
+      ctx.lineWidth = sc(4);
+      ctx.beginPath();
+      ctx.arc(px(pos.x), py(pos.y), s/2 + sc(5), 0, Math.PI*2);
+      ctx.stroke();
+    }
+
+    // Traffic light icon
+    ctx.font = `${sc(14)}px serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🚦', px(pos.x), py(pos.y));
+
+    // Label
+    ctx.font = `bold ${sc(10)}px sans-serif`;
+    ctx.fillStyle = '#1a237e';
+    ctx.textAlign = 'center';
+    ctx.fillText(pos.name, px(pos.x), py(pos.y) + s/2 + sc(10));
+    ctx.fillStyle = '#607d8b';
+    ctx.font = `${sc(8)}px sans-serif`;
+    ctx.fillText(id, px(pos.x), py(pos.y) + s/2 + sc(20));
+
+    // Signal mini-indicators
+    if (info.signals) {
+      info.signals.forEach((sig, i) => {
+        const color = sig.phase==='GREEN'?'#4CAF50':sig.phase==='YELLOW'?'#FFC107':sig.phase==='ALL_RED'?'#9C27B0':'#F44336';
+        const angle = (i / info.signals.length) * Math.PI * 2 - Math.PI/2;
+        const r = s/2 + sc(10);
+        ctx.beginPath();
+        ctx.arc(px(pos.x)+Math.cos(angle)*r, py(pos.y)+Math.sin(angle)*r, sc(4), 0, Math.PI*2);
+        ctx.fillStyle = color;
+        ctx.fill();
+      });
+    }
+  });
+}
+
+function drawDetectionLines(state) {
+  // Draw detection lines at 70% along each road lane
+  Object.entries(ROAD_DEFS).forEach(([id, rd]) => {
+    const from = INTER_POS[rd.from];
+    const to   = INTER_POS[rd.to];
+    const t = 0.70;
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const len = Math.sqrt(dx*dx+dy*dy);
+    const px1 = from.x + dx*t, py1 = from.y + dy*t;
+    // Perpendicular
+    const nx = -dy/len, ny = dx/len;
+    const w = 12;
+    ctx.strokeStyle = 'rgba(255,152,0,0.7)';
+    ctx.lineWidth = sc(1.5);
+    ctx.setLineDash([sc(3), sc(2)]);
+    ctx.beginPath();
+    ctx.moveTo(px(px1 + nx*w), py(py1 + ny*w));
+    ctx.lineTo(px(px1 - nx*w), py(py1 - ny*w));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+}
+
+function drawVehicles(state) {
+  (state.vehicles||[]).forEach(v => {
+    const pos = getVehicleXY(v);
+    if (!pos) return;
+
+    const vLen = sc(v.type==='TRUCK'?10:v.type==='BUS'?9:6);
+    const vWid = sc(4);
+
+    // Compute angle along lane
+    const info = laneMap[v.laneId];
+    let angle = 0;
+    if (info) {
+      const fr = INTER_POS[info.fromId], to = INTER_POS[info.toId];
+      if (fr && to) angle = Math.atan2(to.y-fr.y, to.x-fr.x);
+    }
+
+    ctx.save();
+    ctx.translate(px(pos.x), py(pos.y));
+    ctx.rotate(angle);
+
+    // Shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.2)'; ctx.shadowBlur = sc(3); ctx.shadowOffsetY = sc(1);
+
+    // Body
+    ctx.fillStyle = v.color || '#2196F3';
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = sc(0.5);
+    ctx.beginPath();
+    ctx.roundRect(-vLen/2, -vWid/2, vLen, vWid, sc(1.5));
+    ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Emergency flasher
+    if (v.emergency) {
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.font = `${sc(6)}px serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🚑', 0, 0);
+    }
+
+    // Waiting indicator
+    if (v.waiting) {
+      ctx.fillStyle = '#F44336';
+      ctx.beginPath();
+      ctx.arc(vLen/2+sc(2), -vWid/2, sc(2.5), 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  });
+}
+
+function drawLegend() {
+  const items = [
+    {color:'#4CAF50', label:'Green Signal'},
+    {color:'#F44336', label:'Red Signal'},
+    {color:'#FFC107', label:'Yellow Signal'},
+    {color:'#FF9800', label:'Detection Line'},
+    {color:'#b71c1c', label:'Closed Road'},
+  ];
+  ctx.save();
+  const lx = canvas2d.width - sc(140), ly = py(10);
+  ctx.fillStyle = 'rgba(255,255,255,0.88)';
+  ctx.strokeStyle = '#dde3ea';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(lx, ly, sc(130), sc(10 + items.length*14), 6);
+  ctx.fill(); ctx.stroke();
+  items.forEach((it, i) => {
+    ctx.fillStyle = it.color;
+    ctx.fillRect(lx+sc(6), ly+sc(6)+i*sc(14), sc(10), sc(9));
+    ctx.fillStyle = '#37474f';
+    ctx.font = `${sc(8.5)}px sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.fillText(it.label, lx+sc(20), ly+sc(12)+i*sc(14));
+  });
+  ctx.restore();
+}
+
+// ============================================================
+//  VIEW TOGGLE
+// ============================================================
+function switchView(v) {
+  currentView = v;
+  document.getElementById('btn-2d').classList.toggle('active', v==='2d');
+  document.getElementById('btn-3d').classList.toggle('active', v==='3d');
+  canvas2d.style.display   = v==='2d' ? 'block' : 'none';
+  const c3 = document.getElementById('canvas-3d');
+  c3.style.display = v==='3d' ? 'block' : 'none';
+  if (v==='3d') init3D();
+}
+
+// ============================================================
+//  3D RENDERER (Three.js)
+// ============================================================
+function init3D() {
+  if (three) return; // already initialised
+  try {
+    const canvas3d = document.getElementById('canvas-3d');
+    const rect = mainView.getBoundingClientRect();
+    canvas3d.width  = rect.width;
+    canvas3d.height = rect.height;
+
+    const renderer = new THREE.WebGLRenderer({canvas: canvas3d, antialias:true});
+    renderer.setSize(rect.width, rect.height);
+    renderer.shadowMap.enabled = true;
+    renderer.setClearColor(0x8db87a);
+
+    const scene  = new THREE.Scene();
+    scene.fog    = new THREE.Fog(0x8db87a, 300, 900);
+
+    const camera = new THREE.PerspectiveCamera(50, rect.width/rect.height, 1, 2000);
+    camera.position.set(450, 420, 500);
+    camera.lookAt(450, 0, 300);
+
+    // Lighting
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const sun = new THREE.DirectionalLight(0xfffbe6, 1.2);
+    sun.position.set(300, 600, 400);
+    sun.castShadow = true;
+    scene.add(sun);
+
+    // Ground plane
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(1200, 900),
+      new THREE.MeshLambertMaterial({color:0x8db87a})
+    );
+    ground.rotation.x = -Math.PI/2;
+    ground.position.set(450, 0, 300);
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Build roads as flat boxes
+    const roadMat  = new THREE.MeshLambertMaterial({color:0xd0d0d0});
+    const closedMat= new THREE.MeshLambertMaterial({color:0xff7043});
+
+    const roadMeshes = {};
+    Object.entries(ROAD_DEFS).forEach(([id, rd]) => {
+      const from = INTER_POS[rd.from];
+      const to   = INTER_POS[rd.to];
+      const dx = to.x-from.x, dz = to.y-from.y;
+      const len = Math.sqrt(dx*dx+dz*dz);
+      const angle = Math.atan2(dz, dx);
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, 1, 24), roadMat.clone());
+      mesh.position.set((from.x+to.x)/2, 0.5, (from.y+to.y)/2);
+      mesh.rotation.y = -angle;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      roadMeshes[id] = mesh;
+    });
+
+    // Intersection boxes
+    const interMat = new THREE.MeshLambertMaterial({color:0xe0e0e0});
+    Object.entries(INTER_POS).forEach(([id, pos]) => {
+      const box = new THREE.Mesh(new THREE.BoxGeometry(30, 1.5, 30), interMat);
+      box.position.set(pos.x, 0.75, pos.y);
+      box.receiveShadow = true;
+      scene.add(box);
+      // Traffic light post
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 20, 8), new THREE.MeshLambertMaterial({color:0x555555}));
+      post.position.set(pos.x+14, 11, pos.y+14);
+      scene.add(post);
+    });
+
+    // Vehicle meshes (created dynamically in render3D)
+    const vehicleMeshPool = {};
+
+    three = { renderer, scene, camera, roadMeshes, vehicleMeshPool };
+
+    // Animate loop
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+      if (currentView === '3d') {
+        render3D(simState);
+        renderer.render(scene, camera);
+      }
+    }
+    animate3D();
+  } catch(e) {
+    console.warn('3D init failed, falling back to 2D', e);
+    switchView('2d');
+  }
+}
+
+function render3D(state) {
+  if (!three || !state) return;
+  const {scene, vehicleMeshPool, roadMeshes} = three;
+
+  // Update road colours
+  (state.roads||[]).forEach(r => {
+    const mesh = roadMeshes[r.id];
+    if (mesh) mesh.material.color.setHex(r.closed ? 0xff7043 : 0xd0d0d0);
+  });
+
+  // Vehicle meshes
+  const activeIds = new Set((state.vehicles||[]).map(v=>v.id));
+
+  // Remove finished
+  Object.keys(vehicleMeshPool).forEach(id => {
+    if (!activeIds.has(id)) {
+      scene.remove(vehicleMeshPool[id]);
+      delete vehicleMeshPool[id];
+    }
+  });
+
+  // Add/update
+  (state.vehicles||[]).forEach(v => {
+    const pos = getVehicleXY(v);
+    if (!pos) return;
+
+    if (!vehicleMeshPool[v.id]) {
+      const color = parseInt((v.color||'#2196F3').replace('#',''), 16);
+      const h = v.type==='TRUCK'?5:v.type==='BUS'?4.5:3;
+      const l = v.type==='TRUCK'?16:v.type==='BUS'?12:5;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(l, h, 4),
+        new THREE.MeshLambertMaterial({color})
+      );
+      mesh.castShadow = true;
+      scene.add(mesh);
+      vehicleMeshPool[v.id] = mesh;
+    }
+    const mesh = vehicleMeshPool[v.id];
+    mesh.position.set(pos.x, 3, pos.y);
+
+    // Rotation
+    const info = laneMap[v.laneId];
+    if (info) {
+      const fr = INTER_POS[info.fromId], to = INTER_POS[info.toId];
+      if (fr && to) mesh.rotation.y = -Math.atan2(to.y-fr.y, to.x-fr.x);
+    }
+  });
+}
+
+// ============================================================
+//  RESIZE
+// ============================================================
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  if (three) {
+    const rect = mainView.getBoundingClientRect();
+    three.renderer.setSize(rect.width, rect.height);
+    three.camera.aspect = rect.width / rect.height;
+    three.camera.updateProjectionMatrix();
+  }
+});
+
+// ============================================================
+//  INIT
+// ============================================================
+window.addEventListener('load', async () => {
+  resizeCanvas();
+  connectWS();
+  await loadRoads();
+
+  // Start with a blank 2D render
+  render2D({});
+
+  // Fallback polling if WS unavailable
+  setInterval(async () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      const s = await apiFetch('/status', 'GET');
+      if (s) updateDashboard({...simState, ...s});
+    }
+  }, 2000);
+});
+</script>
+</body>
+</html>
