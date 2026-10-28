@@ -234,7 +234,7 @@ header .subtitle{font-size:.75rem;opacity:.8;margin-left:4px;}
 //  B.E.A.T.S. FRONTEND — JavaScript
 // ============================================================
 
-const API = 'http://localhost:8080/api/simulation';
+const API = `${window.location.origin}/api/simulation`;
 let ws = null;
 let simState = {};
 let currentView = '2d';
